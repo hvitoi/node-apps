@@ -1,0 +1,60 @@
+body {              /* attributes for the whole site, except the anchor <a> */
+    color: #333333;
+    font-family: arial;
+    max-width: 650px;
+    margin: 0 auto;         /* margin is spaced outside of the box. Top/Bottom Left/Right */
+    padding: 0 16px;        /* padding is spaced inside of the box. Top/Bottom Left/Right */
+    background: pink;
+
+    display: flex;
+    flex-direction: column;     /* the default value is row */
+
+    min-height: 100vh;           /* 100% of the view port height */
+}
+
+.main-content {         /* It's the div with everything except the footer */
+    flex-grow: 1;       /* Takes all leftover space */
+}
+
+header {
+    margin-top: 16px;
+    margin-bottom: 48px;
+}
+
+footer {
+    color: #888888;
+    border-top: 1px solid #eeeeee;
+    margin-top: 16px;
+    padding: 0;
+
+}
+
+h1 {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+header a {          /* Target only archor inside of the header */
+    color: #888888;
+    margin-right: 16px;
+    /* text-decoration: none;*/
+}
+
+/* Applies to a only class element */ /* The class element is in a picture */
+.portrait {
+    width: 300px;
+}
+
+input {
+    border: 1px solid #cccccc;
+    padding: 8px;
+}
+
+button {
+    cursor: pointer;
+    border: 1px solid #888888;
+    background: #888888;
+    color: white;
+    padding: 8px;
+     
+}
