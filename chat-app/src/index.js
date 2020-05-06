@@ -1,7 +1,9 @@
-import http from 'http'
-import express from 'express'
-import socketio from 'socket.io'
-import Filter from 'bad-words'
+const http = require('http')
+const express = require('express')
+const socketio = require('socket.io')
+const Filter = require('bad-words')
+const { generateTextMessage, generateLocationMessage } = require('./utils/messages.js')
+const { addUser, removeUser, getUser, getUsersInRoom } = require('./utils/users.js')
 
 
 // Setup application
@@ -20,41 +22,82 @@ app.use(express.static('public'))
 
 
 
+
+
+
+
 // io connections are established upon calling io() on the client-side
 io.on('connection', (socket) => {       // socket object contains information about the client
-    console.log('New web socket connection.')
-    socket.emit('welcomeMessage')
-
-    // Emit event to everybody but the socket
-    socket.broadcast.emit('message', 'A new user has joined.')
 
 
+    socket.on('join', (options, callback) => { 
 
-    // Event listeners
-    socket.on('sendMessage', (message, callback) => {
+        const { error, user } = addUser({ // Either 'error' or 'user' variable will be provided
+            id: socket.id, // socket.io is the unique identifier for the connection
+            ...options
+        }) 
+        
+        if (error) {
+            return callback(error)  // Callback with error if there is any on creating user
+        }
+
+        socket.join(user.room)       // The join() function is only available on the server side. It creates an instance (room) for the socket to join
+        socket.emit('textMessage', generateTextMessage('Admin', 'Welcome to the chat!')) // Welcoming message
+        socket.broadcast.to(user.room).emit('textMessage', generateTextMessage('Admin', `${user.username} has joined the room.`))  // Message to everybody but the socket
+        
+        // Send updated list of users
+        io.to(user.room).emit('roomData', {
+            room: user.room,
+            users: getUsersInRoom(user.room)
+        })
+
+        // Log in the server console
+        console.log(`User '${user.username}' has joined the room '${user.room}'.`)
+    
+        callback()  // Callback with no error
+    })
+
+    socket.on('sendTextMessage', (message, callback) => {
+        const user = getUser(socket.id)
 
         // Check message profanity
         const filter = new Filter()
         if (filter.isProfane(message)) {
             return callback('Profanity not allowed.')
-        } else {
-            io.emit('message', message)
-            return callback('Message delivered.')
         }
+
+        // Emit message to all in the room
+        io.to(user.room).emit('textMessage', generateTextMessage(user.username, message))
+        callback('Message delivered.')
+
     })
 
-    
 
-    socket.on('sendLocation', (coords, callback) => {
-        io.emit('message', `https://google.com/maps?q=${coords.latitude},${coords.longitude}`)
+    socket.on('sendLocationMessage', (coords, callback) => {
+        const user = getUser(socket.id)
+        const url = `https://google.com/maps?q=${coords.latitude},${coords.longitude}`
+
+        io.to(user.room).emit('locationMessage', generateLocationMessage(user.username, url))
         callback('Location shared.')
     })
 
+
+
     socket.on('disconnect', () => {
-        io.emit('message', 'A user has left.')
+        const user = removeUser(socket.id)
+
+        if (user) { // Only if there was a user to be disconnected (user was in a room)
+            io.to(user.room).emit('textMessage', generateTextMessage('Admin',`${user.username} has left.`))
+        
+            // Send updated list of users
+            io.to(user.room).emit('roomData', {
+                room: user.room,
+                users: getUsersInRoom(user.room)
+            })
+        }
+
+        
     })
-
-
 
 
 })
@@ -72,6 +115,17 @@ io.on('connection', (socket) => {       // socket object contains information ab
 
 
 // Listen port
-server.listen(process.env.PORT, () => {
-    console.log(`Server is up on port ${process.env.PORT}.`)
+const port = process.env.PORT || 3000
+server.listen(port, () => {
+    console.log(`Server is up on port ${port}.`)
 })
+
+
+
+// socket.emit(name, message, ack)                          Message to the socket
+// socket.broadcast.emit(name, message, ack)                Message to everybody but the socket
+// socket.broadcast.to(room).emit(name, message, ack)       Message to everybody in a room but the socket
+// socket.join(room)                                        Socket joins a room
+
+// io.emit(name, message, ack)                              Message to everybody
+// io.to(room).emit(name, message, ack)                     Message to everybody in a room
